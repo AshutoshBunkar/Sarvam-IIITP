@@ -401,7 +401,7 @@ Please do not include secrets, credentials, local databases, or generated build 
 ## Acknowledgements
 
 - **[Sarvam AI](https://www.sarvam.ai/)** — conversational AI capabilities.
-- **[IIIT Pune](https://www.iiitpune.ac.in/)** — academic context for the project.
+- **[IIIT Pune](https://iiitp.ac.in/)** — academic context for the project.
 - The open-source communities behind FastAPI, Next.js, React, SQLAlchemy, Tailwind CSS, and Monaco Editor.
 
 ## License
