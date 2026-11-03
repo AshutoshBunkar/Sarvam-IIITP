@@ -120,12 +120,17 @@ export function ContextPanel({
 
       {/* Active Pedagogical Stage */}
       <div className="space-y-2">
-        <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-semibold">
-          Current Socratic Stage
-        </span>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-500 font-semibold">
+            Active Session Stage
+          </span>
+          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+            {currentState}
+          </span>
+        </div>
         <div className="p-3.5 rounded-xl bg-gradient-to-b from-[#10121a] to-[#0c0d12] border border-siren-500/20 space-y-2">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-siren-400" />
+            <span className="w-2 h-2 rounded-full bg-siren-400 animate-pulse" />
             <span className="text-xs font-semibold text-siren-300 font-mono">
               {currentStageInfo.name}
             </span>
@@ -138,6 +143,9 @@ export function ContextPanel({
             <span>{currentStageInfo.tip}</span>
           </div>
         </div>
+        <p className="text-[10px] text-zinc-500 italic px-1">
+          The Navbar reflects this active state. Individual message badges show each turn's historical state.
+        </p>
       </div>
 
       {/* Socratic Principles Summary */}

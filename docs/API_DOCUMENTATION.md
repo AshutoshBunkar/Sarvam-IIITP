@@ -145,6 +145,25 @@ All responses are delivered in JSON format. Authenticated routes require an `Aut
 ]
 ```
 
+### Get Session Detail
+- **Endpoint**: `GET /api/v1/sessions/{session_id}`
+- **Auth**: `Bearer <token>`
+- **Parameters**: `session_id` (UUID in path)
+- **Response**: `200 OK`
+```json
+{
+  "id": "8c385b0d-13bb-40ae-ba81-64d856230f81",
+  "user_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "title": "Recursion Doubt",
+  "programming_language": "python",
+  "natural_language": "English",
+  "current_state": "ELICIT_REASONING",
+  "is_active": true,
+  "created_at": "2026-11-03T12:05:00Z",
+  "updated_at": "2026-11-03T12:06:00Z"
+}
+```
+
 ### Get Session Message History
 - **Endpoint**: `GET /api/v1/sessions/{session_id}/messages`
 - **Auth**: `Bearer <token>`

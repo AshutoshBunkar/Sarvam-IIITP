@@ -28,9 +28,19 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Initializing Bhasha Doubt Solver backend...")
-    # Auto-create tables in development/SQLite environments
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # SQLite / Development: Auto-create tables for instant developer setup
+    # PostgreSQL / Production: Alembic migrations are the authoritative schema source of truth
+    is_sqlite = engine.url.drivername.startswith("sqlite")
+    if is_sqlite:
+        logger.info("SQLite database detected: Creating local schema via Base.metadata.create_all.")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    else:
+        logger.info(
+            "Non-SQLite/PostgreSQL database detected (%s): "
+            "Skipping Base.metadata.create_all. Schema migrations must be applied via Alembic ('alembic upgrade head').",
+            engine.url.drivername,
+        )
     logger.info("Database schema initialized.")
     yield
     logger.info("Shutting down Bhasha Doubt Solver backend...")

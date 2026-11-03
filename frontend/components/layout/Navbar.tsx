@@ -57,16 +57,23 @@ export function Navbar({
         </div>
       </div>
 
-      {/* Middle: Session Title & Stage Badge */}
+      {/* Middle: Session Title & Active Stage Badge */}
       <div className="flex items-center gap-2 max-w-md truncate">
         <span className="text-xs font-medium text-zinc-300 truncate">
           {sessionTitle}
         </span>
-        <span
-          className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${stateStyle.bg} ${stateStyle.text} ${stateStyle.border}`}
+        <div
+          className={`flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-0.5 rounded-full border ${stateStyle.bg} ${stateStyle.border}`}
+          title={`Active Session State: ${currentState} (Live progress of your doubt resolution)`}
         >
-          {currentState}
-        </span>
+          <span className="w-1.5 h-1.5 rounded-full bg-siren-400 animate-pulse" />
+          <span className="text-zinc-400 uppercase text-[9px] font-semibold tracking-wider">
+            Active:
+          </span>
+          <span className={`font-semibold ${stateStyle.text}`}>
+            {currentState}
+          </span>
+        </div>
       </div>
 
       {/* Right: User / Context Toggle */}

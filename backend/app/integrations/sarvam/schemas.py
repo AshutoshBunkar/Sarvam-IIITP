@@ -35,13 +35,31 @@ class SarvamChatResponse(BaseModel):
 
     @property
     def content(self) -> str:
+        """User-facing generated response.
+        NEVER returns reasoning_content (internal reasoning trace).
+        """
         if self.choices and len(self.choices) > 0:
-            # Sarvam may return content=None when finish_reason is "length"
-            # Fall back to reasoning_content if content is None/empty
             msg = self.choices[0].message
             if msg.content:
                 return msg.content
-            if msg.reasoning_content:
-                return msg.reasoning_content
         return ""
+
+    @property
+    def reasoning_content(self) -> Optional[str]:
+        """Internal reasoning trace for diagnostic/debugging purposes only."""
+        if self.choices and len(self.choices) > 0:
+            return self.choices[0].message.reasoning_content
+        return None
+
+    @property
+    def finish_reason(self) -> Optional[str]:
+        """Finish reason reported by the model ('stop', 'length', etc.)."""
+        if self.choices and len(self.choices) > 0:
+            return self.choices[0].finish_reason
+        return None
+
+    @property
+    def has_valid_content(self) -> bool:
+        """Indicates whether a non-empty user-facing response is available."""
+        return bool(self.content and self.content.strip())
 

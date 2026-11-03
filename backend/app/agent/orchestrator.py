@@ -110,6 +110,13 @@ class SocraticOrchestrator:
         response = await self.client.generate_chat_completion(messages=chat_messages)
         raw_content = response.content
 
+        # Defensive check: ensure raw_content is non-empty and does NOT expose internal reasoning
+        if not raw_content or not raw_content.strip():
+            raw_content = (
+                "I apologize, but I could not formulate a response within the available token budget. "
+                "Please rephrase your question or try sharing a smaller code snippet."
+            )
+
         # Parse & validate structured output
         agent_output = self._parse_llm_json(
             raw_text=raw_content,

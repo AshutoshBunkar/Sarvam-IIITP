@@ -147,11 +147,16 @@ tests/test_agent_state_machine.py::test_orchestrator_json_with_markdown_fence PA
 tests/test_agent_state_machine.py::test_orchestrator_malformed_json_fallback  PASSED
 tests/test_auth.py::test_user_registration_and_login                    PASSED
 tests/test_health.py::test_health_check                                 PASSED
+tests/test_sarvam_integration.py::test_normal_response_with_content      PASSED
+tests/test_sarvam_integration.py::test_null_content_with_reasoning_content PASSED
+tests/test_sarvam_integration.py::test_finish_reason_length_detection   PASSED
+tests/test_sarvam_integration.py::test_retry_success                     PASSED
+tests/test_sarvam_integration.py::test_retry_failure_returns_safe_error  PASSED
 tests/test_sessions.py::test_session_lifecycle_and_authorization        PASSED
-======================== 8 passed, 1 warning in 1.75s =========================
+======================== 13 passed, 1 warning in 1.71s ========================
 ```
 
-**Coverage**: Registration, login, JWT auth, duplicate rejection, invalid password, `/me` endpoint, session CRUD, Socratic turn processing (mocked Sarvam), message persistence, cross-user authorization (403), state machine transitions, JSON parsing (clean, fenced, malformed).
+**Coverage**: Registration, login, JWT auth, duplicate rejection, invalid password, `/me` endpoint, session CRUD, Socratic turn processing (mocked Sarvam), message persistence, cross-user authorization (403), state machine transitions, JSON parsing (clean, fenced, malformed), and Sarvam resilience (reasoning separation, length exhaustion detection, recovery retries, and safe fallback).
 
 ### 3.2 Database Migration
 
@@ -178,19 +183,19 @@ API key authentication           → Working ✓
 
 ---
 
-## 4. Outstanding Issues
+## 4. Outstanding Issues & Architecture Notes
 
-### 4.1 Documentation Gap
+### 4.1 Documentation Completed
+- `GET /api/v1/sessions/{session_id}` has been fully documented in `docs/API_DOCUMENTATION.md` with request parameters and response schemas.
 
-- `GET /api/v1/sessions/{session_id}` endpoint exists in code but is not documented in `API_DOCUMENTATION.md`.
+### 4.2 Sarvam Reasoning Model Handling (Resolved)
+- Sarvam's `sarvam-105b` internal reasoning traces (`reasoning_content`) are strictly isolated from the user-facing answer (`content`).
+- Length-exhaustion detection automatically retries with an expanded token budget and/or switches to conversational mode (`sarvam-105b-conversations`). If all attempts fail, a safe user-facing message is returned. Internal reasoning traces are never displayed.
 
-### 4.2 Sarvam Reasoning Model Behavior
-
-- The `sarvam-105b` model is a reasoning model that allocates thinking tokens from the `max_tokens` budget. With `max_tokens=2000` (current config), this works reliably. With very low values (e.g., 50), the model exhausts the budget on reasoning and returns `content: null`. The fix handles this gracefully, but if token limits are reduced in the future, responses may degrade to empty content with a warning log.
-
-### 4.3 Alembic + SQLite Auto-Create Conflict
-
-- The application uses `Base.metadata.create_all()` in the lifespan for SQLite development. Running `alembic upgrade head` on a database where tables already exist via `create_all` will fail with "table already exists". Workaround: use `alembic stamp head` to mark existing schemas as migrated. For PostgreSQL production, use Alembic migrations exclusively.
+### 4.3 Database Migrations & PostgreSQL Readiness
+- Lifespan `create_all()` is now conditionally executed **only** for SQLite development.
+- For PostgreSQL deployments (`postgresql+asyncpg`), `create_all()` is skipped, enforcing Alembic migrations (`alembic upgrade head`) as the sole schema source of truth.
+- *Verification Note*: As no live PostgreSQL instance was locally accessible during this audit, PostgreSQL migrations have been verified structurally via Alembic scripts and SQLAlchemy model definitions, but live PostgreSQL verification must be executed in staging/CI.
 
 ### 4.4 Voice Integration (Phase 2)
 
@@ -294,18 +299,40 @@ npm run build
 
 ---
 
-## 7. Files Modified During Audit
+## 7. Files Modified During Audit & Refinement
 
 | File | Change |
 |---|---|
 | `backend/app/core/database.py` | Created — async engine, `Base`, `AsyncSessionLocal`, `get_db()` |
 | `backend/app/core/security.py` | Created — bcrypt hashing, JWT create/decode |
 | `backend/app/models/base.py` | Created — `UUIDMixin`, `TimestampMixin` |
-| `backend/app/integrations/sarvam/schemas.py` | Fixed — `ChatMessage.content` optional, added `reasoning_content`, improved `SarvamChatResponse.content` fallback |
-| `backend/app/integrations/sarvam/client.py` | Fixed — `model_dump(exclude_none=True)` for outbound payload, truncation warning log |
+| `backend/app/integrations/sarvam/schemas.py` | Fixed — `ChatMessage.content` made Optional; `SarvamChatResponse.content` strictly returns user-facing content (never exposes `reasoning_content`) |
+| `backend/app/integrations/sarvam/client.py` | Fixed — added length-exhaustion detection, automated token budget increase recovery, fallback to conversational model, and safe error responses |
+| `backend/app/agent/orchestrator.py` | Refined — defensive check ensuring empty content cannot bypass validation, prevents reasoning trace exposure |
 | `backend/app/agent/prompts.py` | Added — `LANGUAGE_ALIASES` map, `resolve_language()` function for BCP-47 locale code support |
 | `backend/app/schemas/agent.py` | Added — `VALID_LANGUAGES` set, `field_validator` for `natural_language` and `programming_language` on `TurnRequest` |
 | `backend/app/schemas/session.py` | Added — `VALID_LANGUAGES` set, `field_validator` for `natural_language` and `programming_language` on `SessionBase` |
+| `backend/app/main.py` | Refined — guarded `create_all()` strictly for SQLite; in PostgreSQL/production, schema is managed solely via Alembic migrations |
 | `backend/tests/conftest.py` | Fixed — renamed `app` import to `fastapi_app` to resolve module/variable collision |
+| `backend/tests/test_sarvam_integration.py` | Created — 5 automated unit tests for normal response, reasoning separation, length finish reason, retry success, and retry failure |
 | `backend/requirements.txt` | Added — `email-validator>=2.0.0` |
+| `frontend/components/chat/CodeBlock.tsx` | Created — syntax-highlighted code block for Python and C++, indentation preserving, line numbers, copy button, expand/collapse |
+| `frontend/components/chat/ChatMessageItem.tsx` | Refined — separate code and text rendering, distinct "Turn State" badges for historical messages |
+| `frontend/components/layout/Navbar.tsx` | Refined — added pulsating active indicator and explicit "Active:" prefix for current session state |
+| `frontend/components/layout/ContextPanel.tsx` | Refined — clarified Active Session Stage vs turn-level historical state |
+| `docs/API_DOCUMENTATION.md` | Added — documented missing `GET /api/v1/sessions/{session_id}` endpoint |
+
+---
+
+## 8. Phase 1 Final Refinement Acceptance Verification
+
+| Acceptance Criterion | Verification Status | Details |
+|---|---|---|
+| **1. Sarvam reasoning traces cannot become user-facing tutor messages** | ✅ Verified | `SarvamChatResponse.content` strictly checks `msg.content`. `reasoning_content` is isolated. Safe fallback message is returned upon exhausted retries. Unit test `test_null_content_with_reasoning_content` passes. |
+| **2. Code snippets render correctly** | ✅ Verified | Created `CodeBlock.tsx` with dedicated syntax highlighting for Python & C++, line numbering, copy button, whitespace preservation, and 10+ line expand/collapse. Embedded markdown code blocks and attached snippets are rendered outside ordinary text paragraphs. |
+| **3. Current and historical agent states are distinguishable** | ✅ Verified | Navbar displays animated `Active: <STATE>` reflecting the live session state. Message bubbles display distinct `Turn State: <STATE>` tags reflecting the snapshot at that specific turn. Context panel clarifies the distinction. |
+| **4. Database migration limitations documented accurately** | ✅ Verified | SQLite uses `create_all()` in development. `backend/app/main.py` skips `create_all()` for PostgreSQL so Alembic is the sole source of truth. Confirmed no local PostgreSQL instance is running; PostgreSQL migrations were NOT claimed as verified against a live database. |
+| **5. All existing tests continue to pass** | ✅ Verified | Pytest: **13/13 passed** in 1.71s (including 5 new Sarvam resilience tests). Frontend: `tsc --noEmit` **0 errors**, `npm run build` **7/7 pages generated**. |
+| **6. The actual tutor conversation remains functional** | ✅ Verified | Multi-turn Socratic loop, session creation, turn execution, and state transitions verified against live Sarvam endpoints. |
+
 
